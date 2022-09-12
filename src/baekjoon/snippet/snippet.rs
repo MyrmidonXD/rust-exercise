@@ -4,11 +4,11 @@ use std::io::{self, BufReader, BufRead, BufWriter, Write, Read};
 #[derive(Debug)]
 #[allow(dead_code)]
 struct TestCase {
-    n: u32,
-    stairs: Vec<u32>,
+    n: usize,
+    stairs: Vec<usize>,
 }
 
-fn solve(tc: TestCase) -> u32 {
+fn solve(tc: TestCase) -> usize {
     // TODO: Implement this
     println!("{:?}", tc);
     0
@@ -25,7 +25,7 @@ fn main() {
 
     // Parsing
     let _ = stdin.read_to_string(&mut buffer);
-    let mut inputs = buffer.split_whitespace().map(|s| s.parse::<u32>().unwrap());
+    let mut inputs = buffer.split_whitespace().map(|s| s.parse::<usize>().unwrap());
 
     let n = inputs.next().unwrap();
     let stairs = inputs.collect();
