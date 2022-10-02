@@ -14,32 +14,31 @@ fn solve(tc: TestCase) -> (i64, i64, i64) {
     solutions.sort_unstable();
 
     let mut result = (0, 0, 0);
-    let mut result_sum_abs = i64::MAX;
+    let mut min_sum_abs = i64::MAX;
 
     'outer: for i in 0..n-2 {
-        for j in i+1..n-1 {
-            let sum_tmp = solutions[i] + solutions[j];
+        let a = solutions[i];
+        
+        let mut start = i+1;
+        let mut end = n-1;
 
-            let mut low = j+1;
-            let mut high = n-1;
+        while start < end {
+            let b = solutions[start];
+            let c = solutions[end];
 
-            while low <= high {
-                let curr = (low + high) / 2;
-                let sum = sum_tmp + solutions[curr];
+            let sum = a + b + c;
 
-                if sum.abs() < result_sum_abs {
-                    result = (solutions[i], solutions[j], solutions[curr]);
-                    result_sum_abs = sum.abs();
-                }
+            if sum.abs() < min_sum_abs {
+                result = (a, b, c);
+                min_sum_abs = sum.abs();
+            }
 
-                if sum == 0 {
-                    result = (solutions[i], solutions[j], solutions[curr]);
-                    break 'outer;
-                } else if sum > 0 {
-                    high = curr - 1;
-                } else {
-                    low = curr + 1;
-                }
+            if sum == 0 {
+                break 'outer;
+            } else if sum > 0 {
+                end -= 1;
+            } else {
+                start += 1;
             }
         }
     }
