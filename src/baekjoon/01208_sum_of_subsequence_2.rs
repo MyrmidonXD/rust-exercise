@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, BufReader, BufRead, BufWriter, Write, Read};
+use std::collections::{HashMap};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -9,69 +10,52 @@ struct TestCase {
     seq: Vec<i32>,
 }
 
-fn sum_cases(seq: &[i32], sum: i32, start: usize) -> usize {
-    let end = seq.len() - 1;
-    if start >= end || (sum < 0 && seq[start] >= 0) || (sum > 0 && seq[end] <= 0) || (sum == 0 && (seq[start] > 0 || seq[end] < 0)) {
-        return 0;
+fn subseq_sum_count(seq: &[i32], result: &mut HashMap<i32, usize>, start: usize, end: usize, sum: i32) {
+    if start == end {
+        result.entry(sum).and_modify(|cnt| *cnt += 1).or_insert(1);
+        result.entry(sum + seq[start]).and_modify(|cnt| *cnt += 1).or_insert(1);
+    } else {
+        subseq_sum_count(seq, result, start+1, end, sum);
+        subseq_sum_count(seq, result, start+1, end, sum + seq[start]);
     }
+}
 
-    let mut result = 0;
+fn subseq_sum_count_with_precalc(seq: &[i32], precalc: &HashMap<i32, usize>, start: usize, end: usize, sum: i32, target: i32) -> usize {
+    if start == end {
+        let mut result = 0;
 
-    // Two-pointer algorithm
-    let (mut i, mut j) = (start, end);
-    while i < j {
-        let s = seq[i] + seq[j];
-        if s == sum {
-            let (mut a, mut b) = (0, 0);
-            while i < j {
-                if seq[i] == seq[i+1] {
-                    a += 1;
-                    i += 1;
-                } else if seq[j] == seq[j-1] {
-                    b += 1;
-                    j -= 1;
-                } else {
-                    break;
-                }
-            }
-
-            if i == j {
-                let tmp = a + b;
-                result += (tmp * (tmp + 1)) / 2;
-            } else {
-                result += (a + 1) * (b + 1);
-                i += 1;
-                j -= 1;
-            }
-        } else if s < sum {
-            i += 1;
-        } else {
-            j -= 1;
+        let tail_subseq_sum = sum;
+        if let Some(cnt) = precalc.get(&(target - tail_subseq_sum)) {
+            result += cnt;
         }
-    }
 
-    // recursive call
-    for i in start..(end-1) {
-        let next_sum = sum - seq[i];
-        result += sum_cases(seq, next_sum, i+1);
-    }
+        let tail_subseq_sum = sum + seq[start];
+        if let Some(cnt) = precalc.get(&(target - tail_subseq_sum)) {
+            result += cnt;
+        }
 
-    result
+        result
+    } else {
+        subseq_sum_count_with_precalc(seq, precalc, start+1, end, sum, target) + subseq_sum_count_with_precalc(seq, precalc, start+1, end, sum + seq[start], target)
+    }
 }
 
 fn solve(tc: TestCase) -> usize {
-    let TestCase { n, s, mut seq } = tc;
-    seq.sort_unstable();
+    let TestCase { n, s, seq } = tc;
 
-    // check subsequences of size 1
-    let mut result = 0;
-    for &x in &seq {
-        if x == s {
-            result += 1;
-        }
+    if n == 1 {
+        if seq[0] == s { return 1; } else { return 0; }
     }
 
-    result += sum_cases(&seq, s, 0);
+    let half = (n / 2) - 1;
+
+    let mut sums_count: HashMap<i32, usize> = HashMap::new();
+    subseq_sum_count(&seq, &mut sums_count, 0, half, 0);
+    
+    let mut result = subseq_sum_count_with_precalc(&seq, &sums_count, half+1, n-1, 0, s);
+    if s == 0 {
+        result -= 1; // corner case when the selected subsequence is of 0 elements.
+    }
 
     result
 }
