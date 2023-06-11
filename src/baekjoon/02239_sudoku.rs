@@ -10,35 +10,44 @@ struct TestCase {
 
 #[derive(Debug)]
 struct SudokuBoard {
-    board: Vec<Option<u8>>
+    board: Vec<Option<u8>>,
+    row_status: [[bool; 10]; 9],
+    col_status: [[bool; 10]; 9],
+    block_status: [[bool; 10]; 9],
 }
 
 #[allow(dead_code)]
 impl SudokuBoard {
-    fn get_row_iter<'a>(&'a self, row_index: usize) -> impl Iterator<Item = &'a Option<u8>> {
-        self.board.iter().skip(row_index * 9).take(9)
-    }
-
-    fn get_col_iter<'a>(&'a self, col_index: usize) -> impl Iterator<Item = &'a Option<u8>> {
-        self.board.iter().skip(col_index).step_by(9)
-    }
-
-    fn get_block_iter<'a>(&'a self, block_index: usize) -> impl Iterator<Item = &'a Option<u8>> {
-        let block_start_row = (block_index / 3) * 3; // {0, 1, 2} -> 0, {3, 4, 5} -> 3, {6, 7, 8} -> 6
-        let block_start_col = (block_index % 3) * 3; // {0, 3, 6} -> 0, {1, 4, 7} -> 3, {2, 5, 8} -> 6
-        let block_start = block_start_row * 9 + block_start_col;
-
-        let block_top = self.board.iter().skip(block_start).take(3);
-        let block_middle = self.board.iter().skip(block_start + 9).take(3);
-        let block_bottom = self.board.iter().skip(block_start + 9 * 2).take(3);
-
-        block_top.chain(block_middle).chain(block_bottom)
-    }
-
     fn new(raw_board: Vec<u8>) -> Self {
-        Self {
-            board: raw_board.into_iter().map(|v| if v == 0 { None } else { Some(v) }).collect()
+        let mut sudoku_board = Self { 
+            board: raw_board.into_iter().map(|v| if v == 0 { None } else { Some(v) }).collect(),
+            row_status: [[false; 10]; 9],
+            col_status: [[false; 10]; 9],
+            block_status: [[false; 10]; 9]
+        };
+
+        for i in 0..sudoku_board.board.len() {
+            if let Some(v) = sudoku_board.board[i] {
+                sudoku_board.update_status(i, v, true);
+            }
         }
+
+        sudoku_board
+    }
+
+    fn get_row_index(curr_index: usize) -> usize {
+        curr_index / 9
+    }
+
+    fn get_col_index(curr_index: usize) -> usize {
+        curr_index % 9
+    }
+
+    fn get_block_index(curr_index: usize) -> usize {
+        let row_index = Self::get_row_index(curr_index);
+        let col_index = Self::get_col_index(curr_index);
+
+        (row_index / 3) * 3 + (col_index / 3)
     }
 
     fn get_next_empty_index(&self, curr_index: usize) -> Option<usize> {
@@ -49,46 +58,39 @@ impl SudokuBoard {
         None
     }
 
-    fn get_possible_options(&self, curr_index: usize) -> Vec<u8> {
-        let mut is_possible = [true; 10];
-        is_possible[0] = false;
-
-        let row_index = curr_index / 9;
-        for &cell in self.get_row_iter(row_index) {
-            if let Some(v) = cell {
-                is_possible[v as usize] = false;
-            }
+    fn set(&mut self, curr_index: usize, new_value: u8) {
+        if let None = self.board[curr_index] {
+            self.board[curr_index] = Some(new_value);
+            self.update_status(curr_index, new_value, true);
         }
-
-        let col_index = curr_index % 9;
-        for &cell in self.get_col_iter(col_index) {
-            if let Some(v) = cell {
-                is_possible[v as usize] = false;
-            }
-        }
-
-        let block_index = Self::get_block_index(curr_index);
-        for &cell in self.get_block_iter(block_index) {
-            if let Some(v) = cell {
-                is_possible[v as usize] = false;
-            }
-        }
-
-        let mut result = Vec::new();
-        for i in 1..=9 {
-            if is_possible[i as usize] {
-                result.push(i);
-            }
-        }
-
-        result
     }
 
-    fn get_block_index(curr_index: usize) -> usize {
-        let row_index = curr_index / 9;
-        let col_index = curr_index % 9;
+    fn reset(&mut self, curr_index: usize) {
+        if let Some(old_value) = self.board[curr_index] {
+            self.board[curr_index] = None;
+            self.update_status(curr_index, old_value, false);
+        }
+    }
 
-        (row_index / 3) * 3 + (col_index / 3)
+    fn update_status(&mut self, curr_index: usize, target_value: u8, is_set: bool) {
+        let row_index = Self::get_row_index(curr_index);
+        self.row_status[row_index][target_value as usize] = is_set;
+
+        let col_index = Self::get_col_index(curr_index);
+        self.col_status[col_index][target_value as usize] = is_set;
+
+        let block_index = Self::get_block_index(curr_index);
+        self.block_status[block_index][target_value as usize] = is_set;
+    }
+
+    fn is_valid_at(&self, curr_index: usize, new_value: u8) -> bool {
+        let row_index = Self::get_row_index(curr_index);
+        let col_index = Self::get_col_index(curr_index);
+        let block_index = Self::get_block_index(curr_index);
+    
+        !self.row_status[row_index][new_value as usize]
+            && !self.col_status[col_index][new_value as usize]
+            && !self.block_status[block_index][new_value as usize]
     }
 
     fn solve(&mut self) -> bool {
@@ -100,23 +102,26 @@ impl SudokuBoard {
     }
 
     fn solve_inner(&mut self, curr_index: usize) -> bool {
-        let options = self.get_possible_options(curr_index);
         let next_empty = self.get_next_empty_index(curr_index + 1);
-        for i in options {
-            self.board[curr_index] = Some(i);
+        for v in 1..=9 {
+            if self.is_valid_at(curr_index, v) {
+                self.set(curr_index, v);
 
-            if next_empty.is_none() || self.solve_inner(next_empty.unwrap()) { return true; }
+                if next_empty.is_none() || self.solve_inner(next_empty.unwrap()) { return true; }
+
+                self.reset(curr_index);
+            }
         }
 
-        self.board[curr_index] = None;
         false
     }
 }
 
 impl fmt::Display for SudokuBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for row_index in 0..9 {
-            let row_str = self.get_row_iter(row_index)
+        let mut board_iter = self.board.iter();
+        for _ in 0..9 {
+            let row_str = board_iter.by_ref().take(9)
                 .map(|v| char::from_digit(v.unwrap_or(0_u8) as u32, 10).unwrap())
                 .collect::<String>();
 
