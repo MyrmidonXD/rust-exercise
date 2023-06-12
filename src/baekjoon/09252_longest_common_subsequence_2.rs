@@ -8,51 +8,34 @@ struct TestCase {
     b: Vec<char>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PrevState {
-    Diagonal,
-    Left,
-    Up,
-    None
-}
-
-fn lcs(memo: &mut Vec<Vec<(usize, PrevState)>>, a: &[char], b: &[char]) -> (usize, String) {
+fn lcs(memo: &mut Vec<Vec<usize>>, a: &[char], b: &[char]) -> (usize, String) {
     let m = a.len();
     let n = b.len();
 
     for i in 1..=m {
         for j in 1..=n {
             if a[i-1] == b[j-1] {
-                memo[i][j] = (memo[i-1][j-1].0 + 1, PrevState::Diagonal)
+                memo[i][j] = memo[i-1][j-1] + 1
             } else {
-                if memo[i][j-1].0 >= memo[i-1][j].0 {
-                    memo[i][j] = (memo[i][j-1].0, PrevState::Left);
-                } else {
-                    memo[i][j] = (memo[i-1][j].0, PrevState::Up);
-                }
+                memo[i][j] = memo[i][j-1].max(memo[i-1][j]);
             }
         }
     }
 
-    let lcs_len = memo[m][n].0;
-    let mut lcs = Vec::new();
+    let lcs_len = memo[m][n];
+    let mut lcs = Vec::with_capacity(lcs_len);
 
     let mut i = m;
     let mut j = n;
     while i > 0 && j > 0 {
-        match memo[i][j].1 {
-            PrevState::Diagonal => {
-                lcs.push(a[i-1]);
-                i -= 1;
-                j -= 1;
-            },
-            PrevState::Left => {
-                j -= 1;
-            },
-            PrevState::Up => {
-                i -= 1;
-            }
-            _ => { break; }
+        if a[i-1] == b[j-1] {
+            lcs.push(a[i-1]);
+            i -= 1;
+            j -= 1;
+        } else if memo[i][j-1] >= memo[i-1][j] {
+            j -= 1;
+        } else {
+            i -= 1;
         }
     }
 
@@ -64,7 +47,7 @@ fn solve(tc: TestCase) -> (usize, String) {
     let m = a.len();
     let n = b.len();
 
-    let mut memo = vec![vec![(0, PrevState::None); n+1]; m+1];
+    let mut memo = vec![vec![0; n+1]; m+1];
     lcs(&mut memo, &a, &b)
 }
 
